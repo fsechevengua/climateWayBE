@@ -1,16 +1,17 @@
-var ObjectId = require('mongodb').ObjectID;
-var express = require('express');
-var app = express();
-var MongoClient = require('mongodb').MongoClient;
-var bodyParser = require('body-parser');
-var collection;
+const ObjectId = require('mongodb').ObjectID;
+const express = require('express');
+const app = express();
+const MongoClient = require('mongodb').MongoClient;
+const bodyParser = require('body-parser');
+const dateFormat = require('dateformat');
+let collection;
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 
-MongoClient.connect("mongodb://127.0.0.1:9001/clway", function(err, db) {
+MongoClient.connect("mongodb://127.0.0.1:27017/clway", function(err, db) {
     if (!!err) {
         console.log('Error on MongoDb connection');
     } else {
@@ -31,12 +32,12 @@ app.get('/', function(req, res) {
 });
 
 app.get('/weatherData', function(req, res, next) {
-    var responseData = {};
-    var records = [];
+    let responseData = {};
+    let records = [];
     collection.find({
         "ts": {
-            $gte: new Date("2017-05-05T00:00:00.000Z"),
-            $lte: new Date("2017-05-05T23:59:59.000Z")
+            $gte: "2017-09-15 00:00:00.000",
+            $lte: "2017-09-15 23:59:59.000"
             //$gte: new Date(req.body.date + "T00:00:00.000Z"),
             //$lte: new Date(req.body.date + "T23:59:59.000Z")
         },
@@ -48,9 +49,51 @@ app.get('/weatherData', function(req, res, next) {
     });
 });
 
+app.get('/heatmap', function(req, res, next) {
+    let records = [];
+    collection.find({
+        "device_code": 888039,
+	    "sensor_code": 2
+    }).toArray(function(err, results) {
+        let oldDate = '';
+        let mediaTemperatura = [];
+        let valorTemperatura = 0;
+        let count = 0;
+        results.map((valor, index) => {
+            let newDate = dateFormat(new Date(valor.ts), "yyyy-mm-dd");            
+            
+            if(oldDate === ''){
+                oldDate = newDate;
+            }
+
+            if(oldDate !== newDate){
+                let semana = dateFormat(new Date(valor.ts), "W");
+                let diaDaSemana = dateFormat(new Date(valor.ts), "N");
+                let diaDoMes = dateFormat(new Date(valor.ts), "dd");
+
+                mediaTemperatura.push({
+                    day: diaDaSemana,
+                    week: semana,
+                    value: valorTemperatura/count,
+                    date: diaDoMes
+                });
+                oldDate = newDate;
+                count = 1;
+                valorTemperatura = valor.payload;
+            } else {
+                count++;
+                valorTemperatura = valorTemperatura + valor.payload;
+            }
+        });
+        
+        res.contentType('application/json');
+        res.send(JSON.stringify(mediaTemperatura));
+    });
+});
+
 app.post('/dateWeatherData', function(req, res, next) {
-    var responseData = {};
-    var records = [];
+    let responseData = {};
+    let records = [];
     collection.find({
         "ts": {
             $gte: new Date("2017-05-05T00:00:00.000Z"),
