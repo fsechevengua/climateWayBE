@@ -36,10 +36,10 @@ app.get('/weatherData', function(req, res, next) {
     let records = [];
     collection.find({
         "ts": {
-            $gte: "2017-09-18 00:00:00.000",
-            $lte: "2017-09-18 23:59:59.000"
-            //$gte: new Date(req.body.date + "T00:00:00.000Z"),
-            //$lte: new Date(req.body.date + "T23:59:59.000Z")
+            //$gte: "2017-09-18 00:00:00.000",
+            //$lte: "2017-09-18 23:59:59.000"
+            $gte: req.query.date + " 00:00:00.000",
+            $lte: req.query.date + " 23:59:59.000"
         },
         "device_code": 888039
     }).toArray(function(err, results) {
@@ -52,12 +52,23 @@ app.get('/weatherData', function(req, res, next) {
 app.get('/heatmap', function(req, res, next) {
     let records = [];
     let fullDate;
+    let resultado = [];
+
+    for(let semanaIndex = 1; semanaIndex <= 52; semanaIndex++){
+        for(let diaIndex = 1; diaIndex <= 7; diaIndex++){;
+            resultado.push({
+                day: diaIndex,
+                week: semanaIndex,
+                value: 0,
+                dateDay: '',
+                fullDate: ''
+            });
+        }
+    }
 
     if(req.query.date){
         fullDate = req.query.date ? req.query.date : '';
     }
-
-    console.log(fullDate);
 
     collection.find({
         "device_code": 888039,
@@ -80,6 +91,14 @@ app.get('/heatmap', function(req, res, next) {
                 let diaDoMes = dateFormat(new Date(valor.ts), "dd");
                 let dataCompleta = dateFormat(new Date(valor.ts), "yyyy-mm-dd HH:MM:ss");
 
+                resultado[(parseInt(semana-1)*7) + parseInt(diaDaSemana -1)] = {
+                    day: diaDaSemana,
+                    week: semana,
+                    value: valorTemperatura/count,
+                    dateDay: diaDoMes,
+                    fullDate: dataCompleta
+                };
+
                 mediaTemperatura.push({
                     day: diaDaSemana,
                     week: semana,
@@ -97,7 +116,7 @@ app.get('/heatmap', function(req, res, next) {
         });
         
         res.contentType('application/json');
-        res.send(JSON.stringify(mediaTemperatura));
+        res.send(JSON.stringify(resultado));
     });
 });
 
@@ -106,15 +125,12 @@ app.post('/dateWeatherData', function(req, res, next) {
     let records = [];
     collection.find({
         "ts": {
-            $gte: "2017-09-18 00:00:00.000",
-            $lte: "2017-09-18 23:59:59.000"
-            //$gte: new Date(req.body.date + "T00:00:00.000Z"),
-            //$lte: new Date(req.body.date + "T23:59:59.000Z")
+            $gte: req.body.date + " 00:00:00.000",
+            $lte: req.body.date + " 23:59:59.000"
         },
         "sensor_code": parseInt(req.body.sensor_code),
         "device_code": 888039
     }).toArray(function(err, results) {
-        console.log(results);
         responseData.payload = results;
         res.contentType('application/json');
         res.send(JSON.stringify(responseData));
