@@ -34,6 +34,7 @@ app.get('/', function(req, res) {
 app.get('/weatherData', function(req, res, next) {
     let responseData = {};
     let records = [];
+
     collection.find({
         "ts": {
             //$gte: "2017-09-18 00:00:00.000",
@@ -41,7 +42,7 @@ app.get('/weatherData', function(req, res, next) {
             $gte: req.query.date + " 00:00:00.000",
             $lte: req.query.date + " 23:59:59.000"
         },
-        "device_code": 888039
+        "device_code": parseInt(req.query.device)
     }).toArray(function(err, results) {
         responseData.payload = results;
         res.contentType('application/json');
@@ -71,7 +72,7 @@ app.get('/heatmap', function(req, res, next) {
     }
 
     collection.find({
-        "device_code": 888039,
+        "device_code": parseInt(req.query.device),
         "sensor_code": 2
     }).toArray(function(err, results) {
         let oldDate = '';
@@ -79,8 +80,8 @@ app.get('/heatmap', function(req, res, next) {
         let valorTemperatura = 0;
         let count = 0;
         results.map((valor, index) => {
-            let newDate = dateFormat(new Date(valor.ts), "yyyy-mm-dd");            
-            
+            let newDate = dateFormat(new Date(valor.ts), "yyyy-mm-dd");
+
             if(oldDate === ''){
                 oldDate = newDate;
             }
@@ -114,7 +115,7 @@ app.get('/heatmap', function(req, res, next) {
                 valorTemperatura = valorTemperatura + valor.payload;
             }
         });
-        
+
         res.contentType('application/json');
         res.send(JSON.stringify(resultado));
     });
