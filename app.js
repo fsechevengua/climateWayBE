@@ -73,7 +73,7 @@ app.get('/heatmap', function(req, res, next) {
 
     collection.find({
         "device_code": parseInt(req.query.device),
-        "sensor_code": 2
+        "sensor_code": parseInt(req.query.sensorCode),
     }).toArray(function(err, results) {
         let oldDate = '';
         let mediaTemperatura = [];
