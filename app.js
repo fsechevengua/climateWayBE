@@ -34,20 +34,31 @@ app.get('/', function(req, res) {
 app.get('/weatherData', function(req, res, next) {
     let responseData = {};
     let records = [];
-
-    collection.find({
-        "ts": {
-            //$gte: "2017-09-18 00:00:00.000",
-            //$lte: "2017-09-18 23:59:59.000"
-            $gte: req.query.date + " 00:00:00.000",
-            $lte: req.query.date + " 23:59:59.000"
-        },
-        "device_code": parseInt(req.query.device)
-    }).toArray(function(err, results) {
-        responseData.payload = results;
-        res.contentType('application/json');
-        res.send(JSON.stringify(responseData));
-    });
+    if(req.query.dateRange['begin']){
+        collection.find({
+            "ts": {
+                $gte: req.query.dateRange['begin'],
+                $lte: req.query.dateRange['end']
+            },
+            "device_code": parseInt(req.query.device)
+        }).toArray(function(err, results) {
+            responseData.payload = results;
+            res.contentType('application/json');
+            res.send(JSON.stringify(responseData));
+        });
+    } else {
+        collection.find({
+            "ts": {
+                $gte: req.query.date + " 00:00:00.000",
+                $lte: req.query.date + " 23:59:59.000"
+            },
+            "device_code": parseInt(req.query.device)
+        }).toArray(function(err, results) {
+            responseData.payload = results;
+            res.contentType('application/json');
+            res.send(JSON.stringify(responseData));
+        });
+    }
 });
 
 app.get('/heatmap', function(req, res, next) {
@@ -123,19 +134,34 @@ app.get('/heatmap', function(req, res, next) {
 
 app.post('/dateWeatherData', function(req, res, next) {
     let responseData = {};
-    let records = [];
-    collection.find({
-        "ts": {
-            $gte: req.body.date + " 00:00:00.000",
-            $lte: req.body.date + " 23:59:59.000"
-        },
-        "sensor_code": parseInt(req.body.sensor_code),
-        "device_code": 888039
-    }).toArray(function(err, results) {
-        responseData.payload = results;
-        res.contentType('application/json');
-        res.send(JSON.stringify(responseData));
-    });
+    // Se for utilizado seleção de data com heatmap, busca utilizando begin e end. 
+    if(req.body.dateRange['begin']){
+        collection.find({
+            "ts": {
+                $gte: req.body.dateRange['begin'],
+                $lte: req.body.dateRange['end']
+            },
+            "sensor_code": parseInt(req.body.sensor_code),
+            "device_code": 888039
+        }).toArray(function(err, results) {
+            responseData.payload = results;
+            res.contentType('application/json');
+            res.send(JSON.stringify(responseData));
+        });
+    } else{
+        collection.find({
+            "ts": {
+                $gte: req.body.date + " 00:00:00.000",
+                $lte: req.body.date + " 23:59:59.000"
+            },
+            "sensor_code": parseInt(req.body.sensor_code),
+            "device_code": 888039
+        }).toArray(function(err, results) {
+            responseData.payload = results;
+            res.contentType('application/json');
+            res.send(JSON.stringify(responseData));
+        });
+    }
 });
 
 app.listen(9000);
