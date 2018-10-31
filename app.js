@@ -37,8 +37,8 @@ app.get('/weatherData', function(req, res, next) {
     if(req.query.dateRange['begin']){
         collection.find({
             "ts": {
-                $gte: req.query.dateRange['begin'],
-                $lte: req.query.dateRange['end']
+                $gte: dateFormat(new Date(req.query.dateRange['begin']), "yyyy-mm-dd 00:00:00"),
+                $lte: dateFormat(new Date(req.query.dateRange['end']), "yyyy-mm-dd 23:59:59")
             },
             "device_code": parseInt(req.query.device)
         }).toArray(function(err, results) {
@@ -138,8 +138,8 @@ app.post('/dateWeatherData', function(req, res, next) {
     if(req.body.dateRange['begin']){
         collection.find({
             "ts": {
-                $gte: req.body.dateRange['begin'],
-                $lte: req.body.dateRange['end']
+                $gte: dateFormat(new Date(req.body.dateRange['begin']), "yyyy-mm-dd 00:00:00"),
+                $lte: dateFormat(new Date(req.body.dateRange['end']), "yyyy-mm-dd 23:59:59")
             },
             "sensor_code": parseInt(req.body.sensor_code),
             "device_code": 888039
