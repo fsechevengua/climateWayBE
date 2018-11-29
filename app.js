@@ -6,12 +6,31 @@ const bodyParser = require('body-parser');
 const dateFormat = require('dateformat');
 let collection;
 
+function getWeatherValue(code, result){
+    switch(code){
+        case 0:
+            return result.temperature != null ? result.temperature : 0;
+        case 1:
+            return result.humidity != null ? result.humidity : 0;
+        case 2:
+            return result.windSpeed != null ? result.windSpeed : 0;
+        case 3:
+            return result.windDirection != null ? result.windDirection : 0;
+        case 4:
+            return result.precipitation != null ? result.precipitation : 0;
+        case 5:
+            return result.barometricPressure != null ? result.barometricPressure : 0;
+        default:
+            return  result.solarIrradiation != null ? result.solarIrradiation : 0;
+    }
+}
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 
-MongoClient.connect("mongodb://127.0.0.1:27017/clway", function(err, db) {
+MongoClient.connect("mongodb://127.0.0.1:27017/eaware", function(err, db) {
     if (!!err) {
         console.log('Error on MongoDb connection');
     } else {
@@ -36,11 +55,11 @@ app.get('/weatherData', function(req, res, next) {
     let records = [];
     if(req.query.dateRange['begin']){
         collection.find({
-            "ts": {
-                $gte: dateFormat(new Date(req.query.dateRange['begin']), "yyyy-mm-dd 00:00:00"),
-                $lte: dateFormat(new Date(req.query.dateRange['end']), "yyyy-mm-dd 23:59:59")
+            "timestamp": {
+                $gte: dateFormat(new Date(req.query.dateRange['begin']), "yyyy-mm-ddT00:00:00Z"),
+                $lte: dateFormat(new Date(req.query.dateRange['end']), "yyyy-mm-ddT23:59:59Z")
             },
-            "device_code": parseInt(req.query.device)
+            "collectorId": parseInt(req.query.device)
         }).toArray(function(err, results) {
             responseData.payload = results;
             res.contentType('application/json');
@@ -48,11 +67,11 @@ app.get('/weatherData', function(req, res, next) {
         });
     } else {
         collection.find({
-            "ts": {
-                $gte: req.query.date + " 00:00:00.000",
-                $lte: req.query.date + " 23:59:59.000"
+            "timestamp": {
+                $gte: req.query.date + "T00:00:00.000Z",
+                $lte: req.query.date + "T23:59:59.000Z"
             },
-            "device_code": parseInt(req.query.device)
+            "collectorId": parseInt(req.query.device)
         }).toArray(function(err, results) {
             responseData.payload = results;
             res.contentType('application/json');
@@ -83,25 +102,27 @@ app.get('/heatmap', function(req, res, next) {
     }
 
     collection.find({
-        "device_code": parseInt(req.query.device),
-        "sensor_code": parseInt(req.query.sensorCode),
-    }).toArray(function(err, results) {
+        "collectorId": parseInt(req.query.device),
+        //"sensor_code": parseInt(req.query.sensorCode),
+    }).sort({timestamp: 1}).toArray(function(err, results) {
         let oldDate = '';
+        let oldValue = '';
         let mediaTemperatura = [];
         let valorTemperatura = 0;
         let count = 0;
         results.map((valor, index) => {
-            let newDate = dateFormat(new Date(valor.ts), "yyyy-mm-dd");
+            let newDate = dateFormat(new Date(valor.timestamp), "yyyy-mm-dd");
 
             if(oldDate === ''){
                 oldDate = newDate;
+                oldValue = valor;
             }
 
             if(oldDate !== newDate){
-                let semana = dateFormat(new Date(valor.ts), "W");
-                let diaDaSemana = dateFormat(new Date(valor.ts), "N");
-                let diaDoMes = dateFormat(new Date(valor.ts), "dd");
-                let dataCompleta = dateFormat(new Date(valor.ts), "yyyy-mm-dd HH:MM:ss");
+                let semana = dateFormat(new Date(oldValue.timestamp), "W");
+                let diaDaSemana = dateFormat(new Date(oldValue.timestamp), "N");
+                let diaDoMes = dateFormat(new Date(oldValue.timestamp), "dd");
+                let dataCompleta = dateFormat(new Date(oldValue.timestamp), "yyyy-mm-dd HH:MM:ss");
 
                 resultado[(parseInt(semana-1)*7) + parseInt(diaDaSemana -1)] = {
                     day: diaDaSemana,
@@ -119,11 +140,39 @@ app.get('/heatmap', function(req, res, next) {
                     fullDate: dataCompleta
                 });
                 oldDate = newDate;
+                oldValue = valor;
                 count = 1;
-                valorTemperatura = valor.payload;
+                valorTemperatura = (Math.round(getWeatherValue(parseInt(req.query.sensorCode),oldValue) * 100) / 100) ;
             } else {
                 count++;
-                valorTemperatura = valorTemperatura + valor.payload;
+                valorTemperatura = valorTemperatura + (Math.round(getWeatherValue(parseInt(req.query.sensorCode),oldValue) * 100) / 100) ;
+            }
+
+            if(index == results.length - 1){
+                let semana = dateFormat(new Date(oldValue.timestamp), "W");
+                let diaDaSemana = dateFormat(new Date(oldValue.timestamp), "N");
+                let diaDoMes = dateFormat(new Date(oldValue.timestamp), "dd");
+                let dataCompleta = dateFormat(new Date(oldValue.timestamp), "yyyy-mm-dd HH:MM:ss");
+
+                resultado[(parseInt(semana-1)*7) + parseInt(diaDaSemana -1)] = {
+                    day: diaDaSemana,
+                    week: semana,
+                    value: valorTemperatura/count,
+                    dateDay: diaDoMes,
+                    fullDate: dataCompleta
+                };
+
+                mediaTemperatura.push({
+                    day: diaDaSemana,
+                    week: semana,
+                    value: valorTemperatura/count,
+                    dateDay: diaDoMes,
+                    fullDate: dataCompleta
+                });
+                oldDate = newDate;
+                oldValue = valor;
+                count = 1;
+                valorTemperatura = (Math.round(getWeatherValue(parseInt(req.query.sensorCode),oldValue) * 100) / 100) ;
             }
         });
 
@@ -137,26 +186,35 @@ app.post('/dateWeatherData', function(req, res, next) {
     // Se for utilizado seleção de data com heatmap, busca utilizando begin e end. 
     if(req.body.dateRange['begin']){
         collection.find({
-            "ts": {
-                $gte: dateFormat(new Date(req.body.dateRange['begin']), "yyyy-mm-dd 00:00:00"),
-                $lte: dateFormat(new Date(req.body.dateRange['end']), "yyyy-mm-dd 23:59:59")
+            "timestamp": {
+                $gte: dateFormat(new Date(req.body.dateRange['begin']), "yyyy-mm-ddT00:00:00Z"),
+                $lte: dateFormat(new Date(req.body.dateRange['end']), "yyyy-mm-ddT23:59:59Z")
             },
-            "sensor_code": parseInt(req.body.sensor_code),
-            "device_code": 888039
+            //"sensor_code": parseInt(req.body.sensor_code),
+            "collectorId": 1
         }).toArray(function(err, results) {
+
+            results.map((valor, index) => {
+                results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
+            });
+
             responseData.payload = results;
             res.contentType('application/json');
             res.send(JSON.stringify(responseData));
         });
     } else{
         collection.find({
-            "ts": {
-                $gte: req.body.date + " 00:00:00.000",
-                $lte: req.body.date + " 23:59:59.000"
+            "timestamp": {
+                $gte: req.body.date + "T00:00:00.000Z",
+                $lte: req.body.date + "T23:59:59.000Z"
             },
-            "sensor_code": parseInt(req.body.sensor_code),
-            "device_code": 888039
+           // "sensor_code": parseInt(req.body.sensor_code),
+            "collectorId": 1
         }).toArray(function(err, results) {
+            results.map((valor, index) => {
+                results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
+            });
+
             responseData.payload = results;
             res.contentType('application/json');
             res.send(JSON.stringify(responseData));
