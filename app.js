@@ -37,6 +37,7 @@ MongoClient.connect("mongodb://127.0.0.1:27017/eaware", function(err, db) {
         console.log('MongoDb is Connected');
     }
     collection = db.collection('records');
+    collectionMinMax = db.collection('minmax');
 });
 
 app.all('/*', function(req, res, next) {
@@ -220,6 +221,27 @@ app.post('/dateWeatherData', function(req, res, next) {
             res.send(JSON.stringify(responseData));
         });
     }
+});
+
+app.get('/min-max', function(req, res, next) {
+    collectionMinMax.find({}).toArray(function(err, results) {
+        console.log(results);
+        res.contentType('application/json');
+        res.send(JSON.stringify(results));
+    });
+});
+app.post('/save-min-max', function(req, res, next) {
+    data = req.body.minMax;
+    data.map((object, index) => {
+        if(object.min && object.max){
+            collectionMinMax.save({ 
+                minMaxTipo: object.tipo, 
+                min: object.min,
+                max: object.max
+            });
+        }
+    })
+    res.end();
 });
 
 app.listen(9000);
