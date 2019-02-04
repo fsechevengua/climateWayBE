@@ -51,6 +51,15 @@ app.get('/', function(req, res) {
     res.send('Welcome to API');
 });
 
+app.get('/loadDevices', function(req, res, next) {
+    results = collection.distinct('collectorId', function(err, docs) {
+        res.contentType('application/json');
+        res.send(JSON.stringify(docs.sort()));
+        res.end();
+    });
+});
+    
+
 app.get('/weatherData', function(req, res, next) {
     let responseData = {};
     let records = [];
@@ -105,12 +114,17 @@ app.get('/heatmap', function(req, res, next) {
     collection.find({
         "collectorId": parseInt(req.query.device),
         //"sensor_code": parseInt(req.query.sensorCode),
-    }).sort({timestamp: 1}).toArray(function(err, results) {
+    }).toArray(function(err, results) {
         let oldDate = '';
         let oldValue = '';
         let mediaTemperatura = [];
         let valorTemperatura = 0;
         let count = 0;
+
+        results.sort(function(a,b){
+            return new Date(b.timestamp) - new Date(a.timestamp);
+        });
+
         results.map((valor, index) => {
             let newDate = dateFormat(new Date(valor.timestamp), "yyyy-mm-dd");
 
