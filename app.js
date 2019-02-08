@@ -248,11 +248,11 @@ app.post('/save-min-max', function(req, res, next) {
     data = req.body.minMax;
     data.map((object, index) => {
         if(object.min && object.max){
-            collectionMinMax.save({ 
-                minMaxTipo: object.tipo, 
-                min: object.min,
-                max: object.max
-            });
+            collectionMinMax.update( 
+                {'minMaxTipo' : object.tipo},
+                {'minMaxTipo' : object.tipo, "min": object.min, "max" : object.max },
+                { upsert: true } 
+            )
         }
     })
     res.end();
