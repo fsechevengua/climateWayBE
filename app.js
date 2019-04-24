@@ -20,6 +20,8 @@ function getWeatherValue(code, result){
             return result.precipitation != null ? result.precipitation : 0;
         case 5:
             return result.barometricPressure != null ? result.barometricPressure : 0;
+        case 9:
+            return result.deaths != null ? result.deaths : 0;
         default:
             return  result.solarIrradiation != null ? result.solarIrradiation : 0;
     }
@@ -78,8 +80,8 @@ app.get('/weatherData', function(req, res, next) {
     } else {
         collection.find({
             "timestamp": {
-                $gte: req.query.date + "T00:00:00.000Z",
-                $lte: req.query.date + "T23:59:59.000Z"
+                $gte: req.query.date + "T00:00:00Z",
+                $lte: req.query.date + "T23:59:59Z"
             },
             "collectorId": parseInt(req.query.device)
         }).toArray(function(err, results) {
@@ -90,13 +92,27 @@ app.get('/weatherData', function(req, res, next) {
     }
 });
 
+function getWeekNumber(d) {
+    // Copy date so don't modify original
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    // Set to nearest Thursday: current date + 4 - current day number
+    // Make Sunday's day number 7
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    // Get first day of year
+    var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    // Calculate full weeks to nearest Thursday
+    var weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+    // Return array of year and week number
+    return  weekNo;
+}
+
 app.get('/heatmap', function(req, res, next) {
     let records = [];
     let fullDate;
     let resultado = [];
 
     for(let semanaIndex = 1; semanaIndex <= 52; semanaIndex++){
-        for(let diaIndex = 1; diaIndex <= 7; diaIndex++){;
+        for(let diaIndex = 1; diaIndex <= 7; diaIndex++){
             resultado.push({
                 day: diaIndex,
                 week: semanaIndex,
@@ -106,14 +122,13 @@ app.get('/heatmap', function(req, res, next) {
             });
         }
     }
-
+    
     if(req.query.date){
         fullDate = req.query.date ? req.query.date : '';
     }
 
     collection.find({
         "collectorId": parseInt(req.query.device),
-        //"sensor_code": parseInt(req.query.sensorCode),
     }).toArray(function(err, results) {
         let oldDate = '';
         let oldValue = '';
@@ -124,7 +139,7 @@ app.get('/heatmap', function(req, res, next) {
         results.sort(function(a,b){
             return new Date(b.timestamp) - new Date(a.timestamp);
         });
-
+        
         results.map((valor, index) => {
             let newDate = dateFormat(new Date(valor.timestamp), "yyyy-mm-dd");
 
@@ -134,7 +149,7 @@ app.get('/heatmap', function(req, res, next) {
             }
 
             if(oldDate !== newDate){
-                let semana = dateFormat(new Date(oldValue.timestamp), "W");
+                let semana = getWeekNumber(new Date(oldValue.timestamp));
                 let diaDaSemana = dateFormat(new Date(oldValue.timestamp), "N");
                 let diaDoMes = dateFormat(new Date(oldValue.timestamp), "dd");
                 let dataCompleta = dateFormat(new Date(oldValue.timestamp), "yyyy-mm-dd HH:MM:ss");
@@ -144,7 +159,8 @@ app.get('/heatmap', function(req, res, next) {
                     week: semana,
                     value: valorTemperatura/count,
                     dateDay: diaDoMes,
-                    fullDate: dataCompleta
+                    fullDate: dataCompleta,
+                    cycle: oldValue.cycle != null ? oldValue.cycle : ''
                 };
 
                 mediaTemperatura.push({
@@ -152,8 +168,9 @@ app.get('/heatmap', function(req, res, next) {
                     week: semana,
                     value: valorTemperatura/count,
                     dateDay: diaDoMes,
-                    fullDate: dataCompleta
+                    fullDate: dataCompleta,
                 });
+
                 oldDate = newDate;
                 oldValue = valor;
                 count = 1;
@@ -174,7 +191,8 @@ app.get('/heatmap', function(req, res, next) {
                     week: semana,
                     value: valorTemperatura/count,
                     dateDay: diaDoMes,
-                    fullDate: dataCompleta
+                    fullDate: dataCompleta,
+                    cycle: oldValue.cycle != null ? oldValue.cycle : ''
                 };
 
                 mediaTemperatura.push({
@@ -182,7 +200,7 @@ app.get('/heatmap', function(req, res, next) {
                     week: semana,
                     value: valorTemperatura/count,
                     dateDay: diaDoMes,
-                    fullDate: dataCompleta
+                    fullDate: dataCompleta,
                 });
                 oldDate = newDate;
                 oldValue = valor;
@@ -198,21 +216,18 @@ app.get('/heatmap', function(req, res, next) {
 
 app.post('/dateWeatherData', function(req, res, next) {
     let responseData = {};
-    // Se for utilizado seleção de data com heatmap, busca utilizando begin e end. 
+    // Se for utilizado seleção de data com heatmap, busca utilizando begin e end.
     if(req.body.dateRange['begin']){
         collection.find({
             "timestamp": {
-                $gte: dateFormat(new Date(req.body.dateRange['begin']), "yyyy-mm-ddT00:00:00Z"),
-                $lte: dateFormat(new Date(req.body.dateRange['end']), "yyyy-mm-ddT23:59:59Z")
+                $gte: dateFormat(new Date(req.body.dateRange['begin']), "yyyy-mm-dd'T'00:00:00Z"),
+                $lte: dateFormat(new Date(req.body.dateRange['end']), "yyyy-mm-dd'T'23:59:59Z")
             },
-            //"sensor_code": parseInt(req.body.sensor_code),
-            "collectorId": 1
+            "collectorId": parseInt(req.body.device)
         }).toArray(function(err, results) {
-
             results.map((valor, index) => {
                 results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
             });
-
             responseData.payload = results;
             res.contentType('application/json');
             res.send(JSON.stringify(responseData));
@@ -220,12 +235,12 @@ app.post('/dateWeatherData', function(req, res, next) {
     } else{
         collection.find({
             "timestamp": {
-                $gte: req.body.date + "T00:00:00.000Z",
-                $lte: req.body.date + "T23:59:59.000Z"
+                $gte: new Date(req.body.date+'T00:00:00Z').toISOString(),
+                $lte: new Date(req.body.date+'T23:59:59Z').toISOString()
             },
-           // "sensor_code": parseInt(req.body.sensor_code),
-            "collectorId": 1
+            "collectorId": parseInt(req.body.device)
         }).toArray(function(err, results) {
+            console.log(new Date(req.body.date+'T00:00:00Z'));
             results.map((valor, index) => {
                 results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
             });
@@ -239,18 +254,18 @@ app.post('/dateWeatherData', function(req, res, next) {
 
 app.get('/min-max', function(req, res, next) {
     collectionMinMax.find({}).toArray(function(err, results) {
-        console.log(results);
         res.contentType('application/json');
         res.send(JSON.stringify(results));
     });
 });
+
 app.post('/save-min-max', function(req, res, next) {
     data = req.body.minMax;
     data.map((object, index) => {
         if(object.min && object.max){
             collectionMinMax.update( 
                 {'minMaxTipo' : object.tipo},
-                {'minMaxTipo' : object.tipo, "min": object.min, "max" : object.max },
+                {'minMaxTipo' : object.tipo, "min": object.min, "max" : object.max, "normal" : object.normal },
                 { upsert: true } 
             )
         }
