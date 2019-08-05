@@ -9,21 +9,21 @@ let collection;
 function getWeatherValue(code, result){
     switch(code){
         case 0:
-            return result.temperature != null ? result.temperature : 0;
+            return result.temperature;// != null ? result.temperature : 0;
         case 1:
-            return result.humidity != null ? result.humidity : 0;
+            return result.humidity;// != null ? result.humidity : 0;
         case 2:
-            return result.windSpeed != null ? result.windSpeed : 0;
+            return result.windSpeed;// != null ? result.windSpeed : 0;
         case 3:
-            return result.windDirection != null ? result.windDirection : 0;
+            return result.windDirection;// != null ? result.windDirection : 0;
         case 4:
-            return result.precipitation != null ? result.precipitation : 0;
+            return result.precipitation;// != null ? result.precipitation : 0;
         case 5:
-            return result.barometricPressure != null ? result.barometricPressure : 0;
+            return result.barometricPressure;// != null ? result.barometricPressure : 0;
         case 9:
-            return result.deaths != null ? result.deaths : 0;
+            return result.death;//s != null ? result.deaths : 0;
         default:
-            return  result.solarIrradiation != null ? result.solarIrradiation : 0;
+            return  result.solarIrradiation;// != null ? result.solarIrradiation : 0;
     }
 }
 
@@ -107,8 +107,6 @@ function getWeekNumber(d) {
 }
 
 app.get('/heatmap', function(req, res, next) {
-    let records = [];
-    let fullDate;
     let resultado = [];
 
     for(let semanaIndex = 1; semanaIndex <= 52; semanaIndex++){
@@ -116,9 +114,9 @@ app.get('/heatmap', function(req, res, next) {
             resultado.push({
                 day: diaIndex,
                 week: semanaIndex,
-                value: 0,
+                value: null,
                 dateDay: '',
-                fullDate: ''
+                fullDate: dateFormat(new Date(Date.UTC(2018, 0, diaIndex + (semanaIndex - 1) * 7)), "yyyy-mm-dd")
             });
         }
     }
@@ -202,6 +200,7 @@ app.get('/heatmap', function(req, res, next) {
                     dateDay: diaDoMes,
                     fullDate: dataCompleta,
                 });
+
                 oldDate = newDate;
                 oldValue = valor;
                 count = 1;
@@ -240,7 +239,6 @@ app.post('/dateWeatherData', function(req, res, next) {
             },
             "collectorId": parseInt(req.body.device)
         }).toArray(function(err, results) {
-            console.log(new Date(req.body.date+'T00:00:00Z'));
             results.map((valor, index) => {
                 results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
             });
