@@ -108,6 +108,7 @@ function getWeekNumber(d) {
 
 app.get('/heatmap', function(req, res, next) {
     let resultado = [];
+    const tipo = req.query.tipo;
 
     for (let semanaIndex = 1; semanaIndex <= 52; semanaIndex++) {
         for (let diaIndex = 1; diaIndex <= 7; diaIndex++) {
@@ -130,7 +131,6 @@ app.get('/heatmap', function(req, res, next) {
     }).toArray(function(err, results) {
         let oldDate = '';
         let oldValue = '';
-        let mediaTemperatura = [];
         let valorTemperatura = 0;
         let count = 0;
 
@@ -155,27 +155,27 @@ app.get('/heatmap', function(req, res, next) {
                 resultado[(parseInt(semana - 1) * 7) + parseInt(diaDaSemana - 1)] = {
                     day: diaDaSemana,
                     week: semana,
-                    value: valorTemperatura / count,
+                    value: tipo == 'media' ? valorTemperatura / count : valorTemperatura,
                     dateDay: diaDoMes,
                     fullDate: dataCompleta,
                     cycle: oldValue.cycle != null ? oldValue.cycle : ''
                 };
-
-                mediaTemperatura.push({
-                    day: diaDaSemana,
-                    week: semana,
-                    value: valorTemperatura / count,
-                    dateDay: diaDoMes,
-                    fullDate: dataCompleta,
-                });
 
                 oldDate = newDate;
                 oldValue = valor;
                 count = 1;
                 valorTemperatura = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
             } else {
-                count++;
-                valorTemperatura = valorTemperatura + (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
+                let valor_resultado = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
+                if(tipo == 'media'){
+                    count++;
+                    valorTemperatura = valorTemperatura + valor_resultado;
+                } else if(tipo == 'minima'){
+                    valorTemperatura = valorTemperatura >= valor_resultado ? valorTemperatura : valor_resultado;
+                } else if(tipo == 'maxima'){
+                    valorTemperatura = valorTemperatura <= valor_resultado ? valorTemperatura : valor_resultado;
+                }
+                
             }
 
             if (index == results.length - 1) {
@@ -187,19 +187,11 @@ app.get('/heatmap', function(req, res, next) {
                 resultado[(parseInt(semana - 1) * 7) + parseInt(diaDaSemana - 1)] = {
                     day: diaDaSemana,
                     week: semana,
-                    value: valorTemperatura / count,
+                    value: tipo == 'media' ? valorTemperatura / count : valorTemperatura,
                     dateDay: diaDoMes,
                     fullDate: dataCompleta,
                     cycle: oldValue.cycle != null ? oldValue.cycle : ''
                 };
-
-                mediaTemperatura.push({
-                    day: diaDaSemana,
-                    week: semana,
-                    value: valorTemperatura / count,
-                    dateDay: diaDoMes,
-                    fullDate: dataCompleta,
-                });
 
                 oldDate = newDate;
                 oldValue = valor;
@@ -278,26 +270,28 @@ function calculaMedia(data, key){
 }
 
 app.get('/bullet', function(req, res, next) {
+    let device = req.query.device;
     // Pega a data mais atual salva no banco
-    collection.find({ collectorId: parseInt(req.query.device) }, { _id: 0 }).sort({ "timestamp": -1 }).limit(1).toArray(function(err, data_atual) {
+
+    collection.find({ collectorId: parseInt(device) }, { _id: 0 }).sort({ "timestamp": -1 }).limit(1).toArray(function(err, data_atual) {
         // Pega os dados dos sensores
         collection.find({
             "timestamp": {
                 $gte: dateFormat(new Date(data_atual[0].timestamp), "yyyy-mm-dd'T'00:00:00Z"),
                 $lte: dateFormat(new Date(data_atual[0].timestamp), "yyyy-mm-dd'T'23:59:59Z")
             },
-            "collectorId": parseInt(req.query.device)
+            "collectorId": parseInt(device)
         }).toArray(function(err, results) {
             // Pega os ranges de cada sensor
-            collectionMinMax.find({}).toArray(function(err, ranges) {
-                let dados_bullet = [];
+            collectionMinMax.find({}).toArray(function(err, ranges){
+                let resultado = [];
                 const media_temperatura = calculaMedia(results, 'temperature');
                 const media_pressao = calculaMedia(results, 'barometricPressure');
                 const media_umidade = calculaMedia(results, 'humidity');
                 const media_velocidade_vento = calculaMedia(results, 'windSpeed');
                 const media_mortes_aves = calculaMedia(results, 'death');
 
-                dados_bullet.push({
+                resultado.push({
                         title: 'Temperatura',
                         subtitle: 'Graus Célcius',
                         ranges: [-50, 50, 100],
@@ -333,12 +327,15 @@ app.get('/bullet', function(req, res, next) {
                         markers: [media_mortes_aves]
                     }
                 );
+
                 res.contentType('application/json');
-                res.send(JSON.stringify(dados_bullet));
+                res.send(JSON.stringify(resultado));
                 res.end();
             });
         });
     });
+
+   
 });
 
 app.listen(9000);
