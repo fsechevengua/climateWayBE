@@ -21,7 +21,7 @@ function getWeatherValue(code, result) {
         case 5:
             return result.barometricPressure; // != null ? result.barometricPressure : 0;
         case 9:
-            return result.death; //s != null ? result.deaths : 0;
+            return result.deaths; // != null ? result.deaths : 0;
         default:
             return result.solarIrradiation; // != null ? result.solarIrradiation : 0;
     }
@@ -72,7 +72,7 @@ app.get('/weatherData', function(req, res, next) {
                 $lte: dateFormat(new Date(req.query.dateRange['end']), "yyyy-mm-ddT23:59:59Z")
             },
             "collectorId": parseInt(req.query.device)
-        }).toArray(function(err, results) {
+        }).sort({ "timestamp": 1 }).toArray(function(err, results) {
             responseData.payload = results;
             res.contentType('application/json');
             res.send(JSON.stringify(responseData));
@@ -84,7 +84,7 @@ app.get('/weatherData', function(req, res, next) {
                 $lte: req.query.date + "T23:59:59Z"
             },
             "collectorId": parseInt(req.query.device)
-        }).toArray(function(err, results) {
+        }).sort({ "timestamp": 1 }).toArray(function(err, results) {
             responseData.payload = results;
             res.contentType('application/json');
             res.send(JSON.stringify(responseData));
@@ -167,15 +167,15 @@ app.get('/heatmap', function(req, res, next) {
                 valorTemperatura = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
             } else {
                 let valor_resultado = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
-                if(tipo == 'media'){
+                if (tipo == 'media') {
                     count++;
                     valorTemperatura = valorTemperatura + valor_resultado;
-                } else if(tipo == 'minima'){
+                } else if (tipo == 'minima') {
                     valorTemperatura = valorTemperatura >= valor_resultado ? valorTemperatura : valor_resultado;
-                } else if(tipo == 'maxima'){
+                } else if (tipo == 'maxima') {
                     valorTemperatura = valorTemperatura <= valor_resultado ? valorTemperatura : valor_resultado;
                 }
-                
+
             }
 
             if (index == results.length - 1) {
@@ -209,13 +209,15 @@ app.post('/dateWeatherData', function(req, res, next) {
     let responseData = {};
     // Se for utilizado seleção de data com heatmap, busca utilizando begin e end.
     if (req.body.dateRange['begin']) {
+        const begin = req.body.dateRange['begin'].substr(0, 10);
+        const end = req.body.dateRange['end'].substr(0, 10);
         collection.find({
             "timestamp": {
-                $gte: dateFormat(new Date(req.body.dateRange['begin']), "yyyy-mm-dd'T'00:00:00Z"),
-                $lte: dateFormat(new Date(req.body.dateRange['end']), "yyyy-mm-dd'T'23:59:59Z")
+                $gte: new Date(begin + 'T00:00:00Z').toISOString(),
+                $lte: new Date(end + 'T23:59:59Z').toISOString()
             },
             "collectorId": parseInt(req.body.device)
-        }).toArray(function(err, results) {
+        }).sort({ "timestamp": 1 }).toArray(function(err, results) {
             results.map((valor, index) => {
                 results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
             });
@@ -224,13 +226,16 @@ app.post('/dateWeatherData', function(req, res, next) {
             res.send(JSON.stringify(responseData));
         });
     } else {
+        if(!req.body.date){
+            console.log('Não Enviou');
+        }
         collection.find({
             "timestamp": {
                 $gte: new Date(req.body.date + 'T00:00:00Z').toISOString(),
                 $lte: new Date(req.body.date + 'T23:59:59Z').toISOString()
             },
             "collectorId": parseInt(req.body.device)
-        }).toArray(function(err, results) {
+        }).sort({ "timestamp": 1 }).toArray(function(err, results) {
             results.map((valor, index) => {
                 results[index].payload = getWeatherValue(parseInt(req.body.sensor_code), valor);
             });
@@ -259,9 +264,9 @@ app.post('/save-min-max', function(req, res, next) {
     res.end();
 });
 
-function calculaMedia(data, key){
+function calculaMedia(data, key) {
     var sum = 0;
-    for(var i = 0; i < data.length; i ++){
+    for (var i = 0; i < data.length; i++) {
         if (typeof data[i][key] !== 'undefined') {
             sum += data[i][key] ? parseFloat(data[i][key]) : 0;
         }
@@ -283,50 +288,45 @@ app.get('/bullet', function(req, res, next) {
             "collectorId": parseInt(device)
         }).toArray(function(err, results) {
             // Pega os ranges de cada sensor
-            collectionMinMax.find({}).toArray(function(err, ranges){
+            collectionMinMax.find({}).toArray(function(err, ranges) {
                 let resultado = [];
                 const media_temperatura = calculaMedia(results, 'temperature');
                 const media_pressao = calculaMedia(results, 'barometricPressure');
                 const media_umidade = calculaMedia(results, 'humidity');
                 const media_velocidade_vento = calculaMedia(results, 'windSpeed');
-                const media_mortes_aves = calculaMedia(results, 'death');
+                const media_mortes_aves = calculaMedia(results, 'deaths');
 
                 resultado.push({
-                        title: 'Temperatura',
-                        subtitle: 'Graus Célcius',
-                        ranges: [-50, 50, 100],
-                        measures: [20, 30],
-                        markers: [media_temperatura]
-                    },
-                    {
-                        title: 'Pressão',
-                        subtitle: 'Pressão Atmosférica (bar)',
-                        ranges: [150, 225, 300],
-                        measures: [220, 270],
-                        markers: [media_pressao]
-                    },
-                    {
-                        title: 'Umidade',
-                        subtitle: '%',
-                        ranges: [150, 225, 300],
-                        measures: [220, 270],
-                        markers: [media_umidade]
-                    },
-                    {
-                        title: 'Vento',
-                        subtitle: 'M/s',
-                        ranges: [150, 225, 300],
-                        measures: [220, 270],
-                        markers: [media_velocidade_vento]
-                    },
-                    {
-                        title: 'Morte de Aves',
-                        subtitle: 'Número de aves mortas',
-                        ranges: [150, 225, 300],
-                        measures: [220, 270],
-                        markers: [media_mortes_aves]
-                    }
-                );
+                    title: 'Temperatura',
+                    subtitle: 'Graus Célcius',
+                    ranges: [-50, 50, 100],
+                    measures: [20, 30],
+                    markers: [media_temperatura]
+                }, {
+                    title: 'Pressão',
+                    subtitle: 'Pressão Atmosférica (bar)',
+                    ranges: [150, 225, 300],
+                    measures: [220, 270],
+                    markers: [media_pressao]
+                }, {
+                    title: 'Umidade',
+                    subtitle: '%',
+                    ranges: [150, 225, 300],
+                    measures: [220, 270],
+                    markers: [media_umidade]
+                }, {
+                    title: 'Vento',
+                    subtitle: 'M/s',
+                    ranges: [150, 225, 300],
+                    measures: [220, 270],
+                    markers: [media_velocidade_vento]
+                }, {
+                    title: 'Morte de Aves',
+                    subtitle: 'Número de aves mortas',
+                    ranges: [150, 225, 300],
+                    measures: [220, 270],
+                    markers: [media_mortes_aves]
+                });
 
                 res.contentType('application/json');
                 res.send(JSON.stringify(resultado));
@@ -335,7 +335,7 @@ app.get('/bullet', function(req, res, next) {
         });
     });
 
-   
+
 });
 
 app.listen(9000);
