@@ -9,21 +9,21 @@ let collection;
 function getWeatherValue(code, result) {
     switch (code) {
         case 0:
-            return result.temperature; // != null ? result.temperature : 0;
+            return result.temperature;
         case 1:
-            return result.humidity; // != null ? result.humidity : 0;
+            return result.humidity;
         case 2:
-            return result.windSpeed; // != null ? result.windSpeed : 0;
+            return result.windSpeed;
         case 3:
-            return result.windDirection; // != null ? result.windDirection : 0;
+            return result.windDirection;
         case 4:
-            return result.precipitation; // != null ? result.precipitation : 0;
+            return result.precipitation;
         case 5:
-            return result.barometricPressure; // != null ? result.barometricPressure : 0;
+            return result.barometricPressure;
         case 9:
-            return result.deaths; // != null ? result.deaths : 0;
+            return result.deaths;
         default:
-            return result.solarIrradiation; // != null ? result.solarIrradiation : 0;
+            return result.solarIrradiation;
     }
 }
 
@@ -164,9 +164,9 @@ app.get('/heatmap', function(req, res, next) {
                 oldDate = newDate;
                 oldValue = valor;
                 count = 1;
-                valorTemperatura = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
+                valorTemperatura = (Math.round((getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100));
             } else {
-                let valor_resultado = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
+                let valor_resultado = getWeatherValue(parseInt(req.query.sensorCode), valor);
                 if (tipo == 'media') {
                     count++;
                     valorTemperatura = valorTemperatura + valor_resultado;
@@ -196,7 +196,7 @@ app.get('/heatmap', function(req, res, next) {
                 oldDate = newDate;
                 oldValue = valor;
                 count = 1;
-                valorTemperatura = (Math.round(getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100);
+                valorTemperatura = (Math.round((getWeatherValue(parseInt(req.query.sensorCode), oldValue) * 100) / 100));
             }
         });
 
@@ -278,7 +278,7 @@ app.get('/bullet', function(req, res, next) {
     let device = req.query.device;
     // Pega a data mais atual salva no banco
 
-    collection.find({ collectorId: parseInt(device) }, { _id: 0 }).sort({ "timestamp": -1 }).limit(1).toArray(function(err, data_atual) {
+    collection.find({ "collectorId": parseInt(device) , "temperature": {$ne : 0}}).sort({ "timestamp": -1 }).limit(1).toArray(function(err, data_atual) {
         // Pega os dados dos sensores
         collection.find({
             "timestamp": {
@@ -299,32 +299,32 @@ app.get('/bullet', function(req, res, next) {
                 resultado.push({
                     title: 'Temperatura',
                     subtitle: 'Graus Célcius',
-                    ranges: [-50, 50, 100],
-                    measures: [20, 30],
+                    ranges: [35, 100,100],
+                    measures: [10, 35], 
                     markers: [media_temperatura]
                 }, {
                     title: 'Pressão',
                     subtitle: 'Pressão Atmosférica (bar)',
-                    ranges: [150, 225, 300],
-                    measures: [220, 270],
+                    ranges: [1200, 3000, 3000],
+                    measures: [1000, 1200],
                     markers: [media_pressao]
                 }, {
                     title: 'Umidade',
                     subtitle: '%',
-                    ranges: [150, 225, 300],
-                    measures: [220, 270],
+                    ranges: [100, 100, 100],
+                    measures: [2, 100],
                     markers: [media_umidade]
                 }, {
                     title: 'Vento',
                     subtitle: 'M/s',
-                    ranges: [150, 225, 300],
-                    measures: [220, 270],
+                    ranges: [15, 50, 50],
+                    measures: [2, 15],
                     markers: [media_velocidade_vento]
                 }, {
                     title: 'Morte de Aves',
                     subtitle: 'Número de aves mortas',
-                    ranges: [150, 225, 300],
-                    measures: [220, 270],
+                    ranges: [250, 250, 250],
+                    measures: [0, 250],
                     markers: [media_mortes_aves]
                 });
 
