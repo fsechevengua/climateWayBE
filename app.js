@@ -298,7 +298,7 @@ app.get('/bullet', function(req, res, next) {
 
                 resultado.push({
                     title: 'Temperatura',
-                    subtitle: 'Graus Célcius',
+                    subtitle: 'Graus Celcius',
                     ranges: [35, 100,100],
                     measures: [10, 35], 
                     markers: [media_temperatura]
